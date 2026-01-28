@@ -1,15 +1,13 @@
 import logging
 import sys
-import urllib.parse
 import zoneinfo
 from dataclasses import dataclass
-from datetime import datetime, date
+from datetime import date, datetime
 from io import BytesIO
 from typing import Generator
 from urllib.parse import parse_qs, urlencode, urlparse, urlunparse
 from xml.dom import minidom
 
-import boto3
 import dateutil.parser
 import icalendar
 
@@ -175,31 +173,6 @@ def make_ical(events) -> bytes:
         cal.add_component(event.ical())
     return cal.to_ical()
 
-def parse_s3_url(url):
-    p = urllib.parse.urlparse(url, scheme="s3")
-    assert p.scheme == "s3"
-    return p.netloc, p.path.lstrip("/")
-
-def do_put_s3(s3_url, bs: bytes):
-    logger.info("uploading to: %s", s3_url)
-    s3 = boto3.client("s3")
-    bucket, key = parse_s3_url(s3_url)
-
-    if s3_url.endswith(".ics"):
-        ct = "text/calendar"
-    elif s3_url.endswith(".html"):
-        ct = "text/html"
-    else:
-        ct = None
-
-    s3.put_object(
-        Bucket = bucket,
-        Key = key,
-        Body = bs,
-        ACL = "public-read",
-        ContentType = ct,
-    )
-
 def prepare_redirect(url):
     html = "<html>"
     html += "<body>"
@@ -232,6 +205,3 @@ def run(args):
         logger.info("writing ICAL to: %s", args.file)
         with open(args.file, "bw") as f:
             f.write(ical)
-
-    if args.s3:
-        do_put_s3(args.s3_url, ical)

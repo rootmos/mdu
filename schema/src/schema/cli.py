@@ -4,7 +4,7 @@ import sys
 from typing import Callable
 
 from . import util, app
-from . import logconfig, build_info
+fom . import logconfig, build_info
 from . import env
 
 import argcomplete
@@ -51,14 +51,12 @@ def main_parser():
     )
 
     parser.add_argument("--sandbox", action="store_true")
-    parser.add_argument("--s3-url", default=env("S3_URL", "s3://rootmos-www/mdu/GLM01-VT26.ics"))
 
     outputs = parser.add_argument_group("output").add_mutually_exclusive_group()
     outputs.add_argument("--url", action="store_true")
     outputs.add_argument("--redirect", action="store_true")
     outputs.add_argument("--stdout", action="store_true")
     outputs.add_argument("--file")
-    outputs.add_argument("--s3", action="store_true")
 
     parser.add_argument("kurs", nargs="*")
 

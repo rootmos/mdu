@@ -1,6 +1,6 @@
 [project]
 name = "schema"
-version = "0.0.1"
+version = "0.1.0"
 requires-python = ">=3.14,<4"
 dependencies = [
     "icalendar (>=7.0.0a3,<8.0.0)",
@@ -20,7 +20,6 @@ deterministic-zip-go = ">=3.0.1,<4"
 [project.optional-dependencies]
 cli = [
     "argcomplete (>=3.6.3,<4.0.0)",
-    "boto3 (>=1.42.32,<2.0.0)",
 ]
 
 [tool.poetry.build]
