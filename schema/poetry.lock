@@ -212,5 +212,5 @@ cli = ["argcomplete", "boto3"]
 
 [metadata]
 lock-version = "2.1"
-python-versions = ">=3.13,<4"
-content-hash = "5805b06f8d8eeb7457773bd55706ed2088c1c39e3b450b44964ec1fd93e81b99"
+python-versions = ">=3.14,<4"
+content-hash = "3d39e51016cc9cb82b0f80fd5ab89f8b9a7dab1c61144f62ea3035ef6f216e96"

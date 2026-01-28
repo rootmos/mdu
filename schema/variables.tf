@@ -12,3 +12,8 @@ variable "app" {
   type = string
   default = "mdu-schema"
 }
+
+variable "www-prefix" {
+  type = string
+  default = "/mdu"
+}

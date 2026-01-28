@@ -125,8 +125,9 @@ def emit_env(args):
     fa = args.function_arn or outputs()["lambda_arn"]
     print(f"{env_prefix}FUNCTION_ARN={fa}")
 
-    fu = outputs()["url"]
-    print(f"{env_prefix}FUNCTION_URL={fu}")
+    if "url" in outputs():
+        fu = outputs()["url"]
+        print(f"{env_prefix}FUNCTION_URL={fu}")
 
     token = outputs()["token"]
     print(f"{env_prefix}TOKEN={token}")

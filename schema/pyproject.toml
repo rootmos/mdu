@@ -1,7 +1,7 @@
 [project]
 name = "schema"
 version = "0.0.1"
-requires-python = ">=3.13,<4"
+requires-python = ">=3.14,<4"
 dependencies = [
     "icalendar (>=7.0.0a3,<8.0.0)",
     "python-dateutil (>=2.9.0.post0,<3.0.0)",
@@ -10,6 +10,8 @@ dependencies = [
 
 [project.scripts]
 schema = "schema.cli:main"
+
+[tool.poetry.group.test.dependencies]
 
 [tool.poetry.group.dev.dependencies]
 python-dotenv = ">=1.0.1,<1.1"

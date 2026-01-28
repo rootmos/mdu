@@ -9,7 +9,9 @@ import subprocess
 import sys
 import tempfile
 
-from . import whoami
+from . import whoami, build_info
+
+logger = logging.getLogger(__name__)
 
 def eprint(*args, **kwargs):
     print(*args, file=sys.stderr, **kwargs)
@@ -30,7 +32,9 @@ def temporary_directory(what=None):
 def urlopen(url):
     import urllib.request
     req = urllib.request.Request(url)
-    req.add_header("User-Agent", f"{whoami}/{package_version}")
+    ua = f"{whoami}/{build_info.semver()}"
+    logger.debug("using User-Agent: %s", ua)
+    req.add_header("User-Agent", ua)
     logger.debug("opening: %s", url)
     return urllib.request.urlopen(req)
 

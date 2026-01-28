@@ -1,5 +1,5 @@
 locals {
-  runtime = "python3.13"
+  runtime = "python3.14"
 }
 
 resource "aws_lambda_function" "app" {
@@ -20,9 +20,9 @@ resource "aws_lambda_function" "app" {
 
   environment {
     variables = {
-      TOKEN = random_uuid.token.id,
-      MDU_SCHEMA_LOG_LEVEL = "DEBUG"
+      SCHEMA_LOG_LEVEL = "DEBUG"
       ALERT_SNS_TOPIC_ARN = data.aws_sns_topic.alerts.arn
+      S3_BASE_URL = "s3://${data.aws_s3_bucket.www.id}${var.www-prefix}"
     }
   }
 }

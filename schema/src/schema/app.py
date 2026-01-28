@@ -123,7 +123,7 @@ def parse_post(post) -> Event:
         location = lokal,
     )
 
-def select_courses(selections):
+def select_courses(*selections):
     if not selections:
         return set(KURSER)
 
@@ -155,11 +155,11 @@ def prepare_url(ks, fmt: str | None = None, start: date | None = None) -> URL:
     url = template._replace(query = urlencode(qs, doseq=True))
     return urlunparse(url)
 
-def do_fetch(args, url: URL) -> Generator[Event]:
+def do_fetch(url: URL, sandbox=False) -> Generator[Event]:
     def fetch():
         with util.urlopen(url) as f:
             return f.read()
-    if not args.sandbox:
+    if not sandbox:
         raw = fetch()
     else:
         raw = util.pickle_cache("schema.xml", fetch)
@@ -180,17 +180,24 @@ def parse_s3_url(url):
     assert p.scheme == "s3"
     return p.netloc, p.path.lstrip("/")
 
-def do_s3(args, bs: bytes):
-    logger.info("uploading to: %s", args.s3_url)
+def do_put_s3(s3_url, bs: bytes):
+    logger.info("uploading to: %s", s3_url)
     s3 = boto3.client("s3")
-    bucket, key = parse_s3_url(args.s3_url)
+    bucket, key = parse_s3_url(s3_url)
+
+    if s3_url.endswith(".ics"):
+        ct = "text/calendar"
+    elif s3_url.endswith(".html"):
+        ct = "text/html"
+    else:
+        ct = None
 
     s3.put_object(
         Bucket = bucket,
         Key = key,
         Body = bs,
         ACL = "public-read",
-        ContentType = "text/calendar",
+        ContentType = ct,
     )
 
 def prepare_redirect(url):
@@ -204,7 +211,7 @@ def prepare_redirect(url):
     return html
 
 def run(args):
-    ks = select_courses(args.kurs)
+    ks = select_courses(*args.kurs)
     if args.url:
         print(prepare_url(ks, start=START, fmt=""))
         return
@@ -214,7 +221,7 @@ def run(args):
         return
 
     url = prepare_url(ks, start=START)
-    events = do_fetch(args, url)
+    events = do_fetch(url, sandbox=args.sandbox)
     ical = make_ical(events)
 
     if args.stdout:
@@ -227,4 +234,4 @@ def run(args):
             f.write(ical)
 
     if args.s3:
-        do_s3(args, ical)
+        do_put_s3(args.s3_url, ical)
