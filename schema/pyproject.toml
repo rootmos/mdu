@@ -3,14 +3,32 @@ name = "schema"
 version = "0.0.1"
 requires-python = ">=3.13,<4"
 dependencies = [
-    "argcomplete (>=3.6.3,<4.0.0)",
     "icalendar (>=7.0.0a3,<8.0.0)",
     "python-dateutil (>=2.9.0.post0,<3.0.0)",
-    "boto3 (>=1.42.32,<2.0.0)",
+    "semver (>=3.0.4,<4.0.0)",
 ]
 
 [project.scripts]
 schema = "schema.cli:main"
+
+[tool.poetry.group.dev.dependencies]
+python-dotenv = ">=1.0.1,<1.1"
+deterministic-zip-go = ">=3.0.1,<4"
+
+[project.optional-dependencies]
+cli = [
+    "argcomplete (>=3.6.3,<4.0.0)",
+    "boto3 (>=1.42.32,<2.0.0)",
+]
+
+[tool.poetry.build]
+script = "build.py"
+
+[tool.poetry]
+include = [
+    { path = "src/schema/terraform.py", format = "wheel" },
+    { path = "src/schema/build_info.py", format = "wheel" },
+]
 
 [build-system]
 requires = ["poetry-core>=2.2.1,<3.0.0"]

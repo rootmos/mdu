@@ -1,6 +1,17 @@
 .venv
 __pycache__
 dist
-.*.pickle
+build
 
 out.ics
+.*.pickle
+
+.*.flag
+*.zip
+
+.plans
+.terraform
+.env
+
+src/schema/terraform.py
+src/schema/build_info.py

@@ -1,0 +1,195 @@
+#!/usr/bin/env python3
+
+import argparse
+import base64
+import json
+import os
+import sys
+import hashlib
+import time
+
+import dotenv
+import boto3
+
+import logging
+
+from botocore.credentials import subprocess
+logger = logging.getLogger(__name__)
+
+script_dir = os.path.dirname(os.path.realpath(__file__))
+root = os.getenv("ROOT", os.path.realpath(os.path.join(script_dir, "..")))
+
+_outputs = None
+def outputs():
+    global _outputs
+    if _outputs is None:
+        raw = subprocess.check_output(["terraform", "output", "-json"], cwd=root)
+        j = json.loads(raw)
+        _outputs = {}
+        for k, v in j.items():
+            _outputs[k] = v["value"]
+        logger.debug("outputs = %s", _outputs)
+    return _outputs
+
+def region_of_arn(arn):
+    return arn.split(":")[3]
+
+def function_arn_from_args(args):
+    if args.function_arn is not None:
+        return args.function_arn
+    return outputs()["lambda_arn"]
+
+def invoke(args):
+    arn = function_arn_from_args(args)
+    logger.info(f"invoking: {arn}")
+    L = boto3.client("lambda", region_name=region_of_arn(arn))
+    rsp = L.invoke(FunctionName=arn, LogType="Tail")
+    logger.debug(f"StatusCode: {rsp['StatusCode']}")
+    logger.debug(f"RequestId: {rsp['ResponseMetadata']['RequestId']}")
+    for l in str(base64.b64decode(rsp['LogResult']), "UTF-8").splitlines():
+        logger.info("  " + l)
+
+def function_url_from_args(args):
+    if args.function_url is not None:
+        return args.function_url
+    return outputs()["url"]
+
+def token_from_args(args):
+    if args.token is not None:
+        return args.token
+    return outputs()["token"]
+
+def http(args):
+    url = function_url_from_args(args)
+
+    headers = {
+        "Authorization": token_from_args(args),
+    }
+
+    cmdline = ["http", "-v", "GET", url]
+    for k, v in headers.items():
+        cmdline.append(f"{k}:{v}")
+
+    logger.debug("cmdline: %s", cmdline)
+
+    subprocess.check_call(cmdline)
+
+def build_deployment_package():
+    target = "app.zip"
+    logger.debug("running: make %s", target)
+    subprocess.check_call(["make", target], cwd=root)
+    return os.path.join(root, target)
+
+def reconfigure(args):
+    arn = function_arn_from_args(args)
+
+    dp = build_deployment_package()
+    with open(dp, "rb") as f:
+        bs = f.read()
+    sha256 = hashlib.sha256(bs).digest()
+
+    logger.info("deployment package: %s (SHA256: %s)", dp, sha256.hex())
+
+    L = boto3.client("lambda", region_name=region_of_arn(arn))
+
+    rsp = L.get_function_configuration(FunctionName=arn)
+    current_sha256 = rsp["CodeSha256"]
+    expected_checksum = str(base64.b64encode(sha256), "UTF-8")
+    if current_sha256 == expected_checksum:
+        logger.info("no reconfiguration neccessary")
+        return
+
+    logger.info(f"reconfiguring: %s", arn)
+    L.update_function_code(FunctionName=arn, ZipFile=bs)
+    while True:
+        rsp = L.get_function_configuration(FunctionName=arn)
+        current_sha256 = rsp["CodeSha256"]
+        status = rsp["LastUpdateStatus"]
+        interval = 0.2
+        if status == "InProgress":
+            logger.debug("waiting for update to complete (sleep %ss)", interval)
+            time.sleep(interval)
+        else:
+            if expected_checksum != current_sha256:
+                raise RuntimeError(f"unexpected state ({status}): {expected_checksum} != {current_sha256}")
+            else:
+                break
+
+env_prefix = "LAMBDA_"
+def env(var, default=None):
+    return os.environ.get(env_prefix + var, default)
+
+def emit_env(args):
+    print(f"{env_prefix}LOG_LEVEL={args.log.upper()}")
+
+    fa = args.function_arn or outputs()["lambda_arn"]
+    print(f"{env_prefix}FUNCTION_ARN={fa}")
+
+    fu = outputs()["url"]
+    print(f"{env_prefix}FUNCTION_URL={fu}")
+
+    token = outputs()["token"]
+    print(f"{env_prefix}TOKEN={token}")
+
+def setup_logger(level):
+    name = __name__
+    if name == "__main__":
+        name = os.path.basename(sys.argv[0])
+    l = logging.getLogger(name)
+    l.setLevel(level)
+
+    ch = logging.StreamHandler()
+    ch.setLevel(level)
+
+    f = logging.Formatter(fmt="%(asctime)s:%(name)s:%(levelname)s %(message)s", datefmt="%Y-%m-%dT%H:%M:%S%z")
+    ch.setFormatter(f)
+
+    l.addHandler(ch)
+    return l
+
+def parse_args():
+    parser = argparse.ArgumentParser(
+            description="AWS Lambda function manager",
+            formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+
+    parser.add_argument("--log", default=env("LOG_LEVEL", "INFO"), help="set log level")
+    parser.add_argument("--log-file", metavar="FILE", default=env("LOG_FILE"), help="redirect stdout and stderr to FILE")
+
+    parser.add_argument("-f", "--function-arn", default=env("FUNCTION_ARN"))
+
+    subparsers = parser.add_subparsers(dest="cmd", required=True)
+
+    env_cmd = subparsers.add_parser("env")
+    invoke_cmd = subparsers.add_parser("invoke")
+    reconfigure_cmd = subparsers.add_parser("reconfigure")
+
+    http_cmd = subparsers.add_parser("http")
+    http_cmd.add_argument("-u", "--function-url", default=env("FUNCTION_URL"))
+    http_cmd.add_argument("-t", "--token", default=env("TOKEN"))
+
+    return parser.parse_args()
+
+def main():
+    dotenv.load_dotenv()
+
+    args = parse_args()
+    if args.log_file is not None:
+        sys.stderr = sys.stdout = open(args.log_file, "a")
+
+    global logger
+    logger = setup_logger(args.log.upper())
+    logger.debug("args: %s", args)
+
+    if args.cmd == "invoke":
+        invoke(args)
+    elif args.cmd == "env":
+        emit_env(args)
+    elif args.cmd == "reconfigure":
+        reconfigure(args)
+    elif args.cmd == "http":
+        http(args)
+    else:
+        raise RuntimeError(f"unknown command: {args.cmd}")
+
+if __name__ == "__main__":
+    main()

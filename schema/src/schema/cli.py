@@ -4,7 +4,8 @@ import sys
 from typing import Callable
 
 from . import util, app
-from . import env, package_version
+from . import logconfig, terraform, build_info
+from . import env
 
 import argcomplete
 
@@ -27,12 +28,12 @@ def parse_args(build: Callable[[], argparse.ArgumentParser]) -> argparse.Namespa
 
     args, _ = early.parse_known_args()
 
-    util.setup_logger(args.log)
+    logconfig.setup(args.log)
     logger.debug("early args: %s", args)
 
     if args.version:
         prog = os.path.basename(sys.argv[0])
-        print(f"{prog} {package_version}")
+        print(f"{prog} {build_info.semver()}")
         sys.exit(0)
 
     if args.completion_script:

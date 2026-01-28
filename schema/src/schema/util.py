@@ -9,23 +9,7 @@ import subprocess
 import sys
 import tempfile
 
-from . import package_name, package_version, whoami
-
-import logging
-logger = logging.getLogger(__name__)
-
-def setup_logger(level, logger=None, name=None):
-    level = level.upper()
-    if logger is None:
-        logger = logging.getLogger(name=name or package_name)
-    logger.setLevel(level)
-
-    handler = logging.StreamHandler()
-    handler.setLevel(level)
-    logger.addHandler(handler)
-
-    fmt = logging.Formatter(fmt="%(asctime)s:%(name)s:%(levelname)s %(message)s", datefmt="%Y-%m-%dT%H:%M:%S%z")
-    handler.setFormatter(fmt)
+from . import whoami
 
 def eprint(*args, **kwargs):
     print(*args, file=sys.stderr, **kwargs)

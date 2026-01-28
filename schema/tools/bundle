@@ -1,0 +1,94 @@
+#!/bin/bash
+
+set -o nounset -o pipefail -o errexit
+
+SCRIPT_DIR=$(readlink -f "$0" | xargs dirname)
+PROJECT=$(readlink -f "$SCRIPT_DIR/..")
+
+TMP=$(mktemp -d)
+trap 'rm -rf $TMP' EXIT
+
+OPTS=()
+while getopts "n-" OPT; do
+    case $OPT in
+        n) OPTS+=("--dry-run") ;;
+        -) break ;;
+        ?) exit 2 ;;
+    esac
+done
+shift $((OPTIND-1))
+
+OUTPUT=$1
+
+find1() {
+    local fs
+    mapfile -t fs < <(find "$@")
+    case "${#fs[@]}" in
+        0) echo 1>&2 "unable to find: $*"; exit 1;;
+        1) echo "${fs[0]}" ;;
+        *) echo 1>&2 "unambiguous find: $*"; exit 1;;
+    esac
+}
+
+do_zip() {
+    find "$2" -type d -name '__pycache__' -exec rm -rf {} +
+    find "$2" -name "RECORD" -exec sed -i '/^..\/..\//d' {} \;
+    local target
+    target=$(readlink -f "$1")
+    rm -f "$target"
+    poetry run -P "$PROJECT" -C "$2" -- deterministic-zip "$target" -r .
+}
+
+do_unzip() {
+    mkdir "$1"
+    (cd "$1" && unzip -q "$(readlink -f "$2")")
+}
+
+if grep -cq '^deps' <<< "$(basename "$OUTPUT")"; then
+    if python -c "import sys; sys.exit(sys.prefix == sys.base_prefix)"; then
+        echo 1>&2 "don't run me from inside a virtualenv please"
+        exit 1
+    fi
+
+    echo 1>&2 "building deps: $OUTPUT"
+
+    export VIRTUALENVS=$TMP/virtualenvs
+    (
+        export POETRY_VIRTUALENVS_PATH=$VIRTUALENVS
+        export POETRY_VIRTUALENVS_IN_PROJECT=false
+        export POETRY_VIRTUALENVS_OPTIONS_NO_PIP=true
+        export POETRY_VIRTUALENVS_OPTIONS_ALWAYS_COPY=true
+        poetry -P "$PROJECT" install --no-root "${OPTS[@]}" \
+            --without=test --without=dev
+    )
+    SITE_PACKAGES=$(find1 "$VIRTUALENVS" -name "site-packages" -type d)
+
+    ROOT="$TMP/root"
+    mkdir -p "$ROOT/python"
+    mv "$(readlink -f "$SITE_PACKAGES/../../../lib")" "$ROOT/python/"
+    do_zip "$OUTPUT" "$ROOT"
+elif grep -cq '^app' <<< "$(basename "$OUTPUT")"; then
+    echo 1>&2 "building app: $OUTPUT"
+
+    poetry -P "$PROJECT" build --output="$TMP" --format=wheel
+
+    WHEEL=$(find1 "$TMP" -name "*.whl")
+    ROOT=$TMP/root
+    do_unzip "$ROOT" "$WHEEL"
+    do_zip "$OUTPUT" "$ROOT"
+else
+    echo 1>&2 "don't know how to build: $OUTPUT"
+    exit 1
+fi
+
+unzip -qq -t "$OUTPUT"
+
+python - "$OUTPUT" <<EOF
+import hashlib
+import sys
+import base64
+path = sys.argv[1]
+with open(path, "rb") as f:
+    d = hashlib.file_digest(f, "SHA256")
+print(f"{d.hexdigest()}\t{str(base64.b64encode(d.digest()),'UTF-8')}\t{path}")
+EOF
