@@ -54,6 +54,7 @@ def main_parser():
 
     outputs = parser.add_argument_group("output").add_mutually_exclusive_group()
     outputs.add_argument("--url", action="store_true")
+    outputs.add_argument("--redirect", action="store_true")
     outputs.add_argument("--stdout", action="store_true")
     outputs.add_argument("--file")
     outputs.add_argument("--s3", action="store_true")

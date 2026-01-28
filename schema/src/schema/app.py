@@ -193,10 +193,24 @@ def do_s3(args, bs: bytes):
         ContentType = "text/calendar",
     )
 
+def prepare_redirect(url):
+    html = "<html>"
+    html += "<body>"
+    html += "<script>"
+    html += f'window.location.assign("{url}")'
+    html += "</script>"
+    html += "</body>"
+    html += "</html>"
+    return html
+
 def run(args):
     ks = select_courses(args.kurs)
     if args.url:
         print(prepare_url(ks, start=START, fmt=""))
+        return
+
+    if args.redirect:
+        print(prepare_redirect(prepare_url(ks, start=START, fmt="")))
         return
 
     url = prepare_url(ks, start=START)
