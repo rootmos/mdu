@@ -1,0 +1,138 @@
+#!/usr/bin/env python3
+
+import argparse
+import base64
+import hashlib
+import contextlib
+import io
+import logging
+import os
+import subprocess
+import sys
+import tempfile
+from contextlib import contextmanager
+from typing import Callable, Generator
+
+try:
+    import argcomplete
+    has_argcomplete = True
+except ImportError:
+    has_argcomplete = False
+
+whoami = "build"
+def env(var, default=None):
+    return os.environ.get("BUILD_" + var, default)
+logger = logging.getLogger(whoami)
+
+def setup_logger(level):
+    logger.setLevel(level.upper())
+
+    ch = logging.StreamHandler()
+    ch.setLevel(level.upper())
+
+    f = logging.Formatter(fmt="%(asctime)s:%(name)s:%(levelname)s %(message)s", datefmt="%Y-%m-%dT%H:%M:%S%z")
+    ch.setFormatter(f)
+
+    logger.addHandler(ch)
+
+def parse_args(build: Callable[[], argparse.ArgumentParser]) -> argparse.Namespace:
+    early = argparse.ArgumentParser(add_help=False)
+    main_parser = build()
+
+    for p in [ early, main_parser ]:
+        p.add_argument("--log", default=env("LOG_LEVEL", "INFO"), help="set log level")
+
+    if has_argcomplete:
+        for p in [ early, main_parser ]:
+            p.add_argument("--completion-script", action="store_true", help="print script that when sourced configures shell completion, then exit")
+
+    args, _ = early.parse_known_args()
+
+    setup_logger(args.log)
+    logger.debug("early args: %s", args)
+
+    if has_argcomplete and args.completion_script:
+        prog = os.path.basename(sys.argv[0])
+        sys.stdout.write(argcomplete.shellcode([ prog ]))
+        sys.exit(0)
+
+    if has_argcomplete:
+        argcomplete.autocomplete(main_parser)
+
+    return main_parser.parse_args()
+
+def main_parser() -> argparse.ArgumentParser:
+    description = "build command-line tool"
+    parser = argparse.ArgumentParser(description=description, formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+
+    parser.add_argument("--livejs", action="store_true")
+    parser.add_argument("--pretty", action="store_true")
+    parser.add_argument("output", nargs="?")
+
+    return parser
+
+def livejs_script():
+    url = "https://livejs.com/live.js"
+    sha256 = "216a15f4adf50aba72a3236eba1697d3808c31bb6a5f2ac5b4e096fc553f22ce"
+    integrity = "sha256-" + str(base64.b64encode(bytes.fromhex(sha256)), "UTF-8")
+    return f'<script type="text/javascript" src="{url}" integrity="{integrity}" crossorigin="anonymous"></script>'
+
+def script(path):
+    with open(path, "rb") as f:
+        bs = f.read()
+
+    sha256 = hashlib.sha256(bs)
+    integrity = "sha256-" + str(base64.b64encode(sha256.digest()), "UTF-8")
+    url = "data:text/javascript;base64," + str(base64.b64encode(bs), "UTF-8")
+    return f'<script src="{url}" integrity="{integrity}" crossorigin="anonymous"></script>'
+
+def render(args, o):
+    o.write('<!DOCTYPE html>')
+    o.write('<html>')
+
+    o.write('<head>')
+
+    o.write('<title>')
+    o.write("Tåg")
+    o.write('</title>')
+
+    if args.livejs:
+        o.write(livejs_script())
+    o.write('</head>')
+
+    o.write('<body>')
+    o.write(script("main.js"))
+    o.write('</body>')
+
+    o.write('</html>')
+
+@contextmanager
+def tidy(o: io.Writer, pretty: False) -> Generator[io.Writer]:
+    with tempfile.TemporaryDirectory() as tmp:
+        path = os.path.join(tmp, "input.html")
+        with open(path, "w") as i:
+            yield i
+
+        # cmdline = ["xmllint", "--format", "--html", path]
+        cmdline = [ "tidy", "-utf8", "-q" ]
+        cmdline += [ "--add-meta-charset", "yes" ]
+        if pretty:
+            cmdline += [ "--indent", "yes" ]
+            cmdline += [ "--wrap", "0" ]
+        cmdline += [ path ]
+        s = subprocess.check_output(cmdline, text=True)
+        o.write(s)
+
+def main(args):
+    if args.output is None:
+        O = lambda: sys.stdout
+    else:
+        O = lambda: open(args.output, "w")
+
+    with O() as o, tidy(o, pretty=args.pretty) as t:
+        render(args, t)
+
+if __name__ == "__main__":
+    args = parse_args(main_parser)
+    logger.debug("args: %s", args)
+    main(args)
