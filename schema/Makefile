@@ -36,7 +36,7 @@ init: .terraform.flag .poetry.flag
 	touch "$@"
 
 poetry.lock .poetry.flag:
-	poetry install -E cli
+	poetry install -E cli --with=dev
 	touch "$@"
 
 reinit:

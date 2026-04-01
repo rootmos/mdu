@@ -16,6 +16,7 @@ schema = "schema.cli:main"
 [tool.poetry.group.dev.dependencies]
 python-dotenv = ">=1.0.1,<1.1"
 deterministic-zip-go = ">=3.0.1,<4"
+boto3 = "^1.42.80"
 
 [project.optional-dependencies]
 cli = [
