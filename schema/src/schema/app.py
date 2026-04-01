@@ -16,9 +16,14 @@ from . import util
 logger = logging.getLogger(__name__)
 
 KURSER = [
+    # VT26
     "OAU258-AU258V26-",
     "OAU376-AU37AV26-",
     "OAU278-AU278V26-",
+
+    # ST26
+    "OAU257-30001V26-",
+    "OAU254-30000V26-",
 ]
 
 START = date.fromisoformat("2026-01-19")
