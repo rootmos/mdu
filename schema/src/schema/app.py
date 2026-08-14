@@ -24,6 +24,10 @@ KURSER = [
     # ST26
     "OAU257-30001V26-",
     "OAU254-30000V26-",
+
+    # HT26
+    "OAU282-10235H26-",
+    "OAU346-10286H26-",
 ]
 
 START = date.fromisoformat("2026-01-19")
