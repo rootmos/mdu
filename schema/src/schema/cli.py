@@ -4,7 +4,7 @@ import sys
 from typing import Callable
 
 from . import util, app
-fom . import logconfig, build_info
+from . import logconfig, build_info
 from . import env
 
 import argcomplete
