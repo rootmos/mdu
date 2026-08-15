@@ -109,7 +109,6 @@ def parse_post(post) -> Event:
     datum = dateutil.parser.parse(e.getAttribute("datum"), yearfirst=True).date()
     start = datetime.combine(datum, dateutil.parser.parse(e.getAttribute("startTid")).time(), tzinfo=TZ)
     slut = datetime.combine(datum, dateutil.parser.parse(e.getAttribute("slutTid")).time(), tzinfo=TZ)
-    logger.debug("datum = %s", datum)
 
     moment = CDATA(getSingularChild("moment", post)) or ""
     kommentar = CDATA(getSingularChild("kommentar", post))
